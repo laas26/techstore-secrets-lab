@@ -1,23 +1,64 @@
+# Menor privilegio por allowlist: cada servico recebe SOMENTE as variaveis que
+# utiliza. O uso de `env_file: .env` injetaria TODOS os segredos em TODOS os
+# containers (inclusive MYSQL_ROOT_PASSWORD na app e as chaves de pagamento no
+# MySQL), o que contraria o principio do menor privilegio.
+#
+# A sintaxe ${VAR:?mensagem} faz o Compose falhar imediatamente se um segredo
+# obrigatorio nao estiver definido, em vez de subir com credencial vazia.
+
+services:
+  app:
+    build: .
+    init: true
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-techstore}
+      DB_USER: ${DB_USER:-techstore_app}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD nao definido - configure o .env a partir do .env.example}
+      PAYMENT_API_KEY: ${PAYMENT_API_KEY:?PAYMENT_API_KEY nao definido}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN nao definido}
+    depends_on:
+      database:
+        condition: service_started
+    # Superficie de execucao reduzida.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  database:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD nao definido}
+      MYSQL_DATABASE: ${DB_NAME:-techstore}
+      MYSQL_USER: ${DB_USER:-techstore_app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD nao definido}
+    # Sem `ports:` o MySQL fica alcanavel apenas na rede interna do Compose.
+    # Expor 3306 para o host amplia desnecessariamente a superficie de ataque;
+    # descomente apenas se precisar de acesso externo durante o desenvolvimento.
+    # ports:
+    #   - "127.0.0.1:3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      # Consulta real: ping sozinho retorna sucesso mesmo com senha errada.
+      test:
+        - CMD-SHELL
+        - mysql -h 127.0.0.1 -u "$$MYSQL_USER" -p"$$MYSQL_PASSWORD" -e "SELECT 1" "$$MYSQL_DATABASE" >/dev/null 2>&1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
-  -.:/app
-ports:
-  - "3000:3000"
-environment:
-  - NODE_ENV: development
-  - DB_HOST: database
-  - DB_PORT: 3306
-  - DB_USER: techstore_app
-  - DB_PASSWORD: ***REDACTED***
-  - DB_NAME: techstore
-
-
-database:
-  image: mysql:8.0
-  environment:
-    - MYSQL_ROOT_PASSWORD: ***REDACTED***
-    - MYSQL_DATABASE: techstore
-    - MYSQL_USER: techstore_app
-    - MYSQL_PASSWORD: ***REDACTED***
-    - MYSQL_ROOT_PASSWORD: Root***REDACTED***
-  ports:
-    - "3306:3306"
+  db_data:

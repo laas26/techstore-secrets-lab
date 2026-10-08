@@ -1,0 +1,32 @@
+# Segredos e configuracao local nunca devem entrar no contexto de build.
+# Sem este arquivo, `COPY . .` no Dockerfile gravaria o .env em uma layer da imagem.
+.env
+.env.*
+!.env.example
+config/
+secrets/
+*.key
+*.pem
+*.p12
+
+# Versionamento e IDE
+.git
+.gitignore
+.github
+node_modules
+npm-debug.log*
+
+# Artefatos
+logs
+dist
+coverage
+*.md
+!README.md
+SECURITY.md
+
+# Ambientes de apoio
+Dockerfile
+docker-compose.yml
+.dockerignore
+.vscode
+.idea

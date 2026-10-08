@@ -6,7 +6,8 @@
     "scripts": {
         "start": "node src/app.js",
         "dev": "node src/app.js",
-        "backup": "node scripts/backup.js"
+        "backup": "node scripts/backup.js",
+        "validate:config": "node scripts/validate-config.js"
     },
     "dependencies": {
         "dotenv": "^16.4.7",
